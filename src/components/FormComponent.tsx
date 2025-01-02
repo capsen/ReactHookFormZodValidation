@@ -1,8 +1,10 @@
 // src/components/FormComponent.tsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { TextField, Button, Box } from '@mui/material';
+import { fetchInitialData } from '../api/api';
 
 // Define the validation schema
 const schema = z.object({
@@ -14,37 +16,67 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 const FormComponent: React.FC = () => {
+  const [initialData, setInitialData] = useState<FormData | null>(null);
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    reset,
+    formState: { errors, isDirty },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
+    defaultValues: initialData || { name: '', email: '', age: 0, },
   });
+
+  useEffect(() => {
+    const loadInitialData = async () => {
+      const data = await fetchInitialData();
+      setInitialData(data);
+      reset(data);
+    };
+    loadInitialData();
+  }, [reset]);
 
   const onSubmit = (data: FormData) => {
     console.log(data);
   };
 
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (isDirty) {
+        event.preventDefault();
+        event.returnValue = ''; // Prompt user with default browser message
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isDirty]);
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <div>
-        <label htmlFor="name">Name</label>
-        <input id="name" {...register('name')} />
-        {errors.name && <p>{errors.name.message}</p>}
-      </div>
-      <div>
-        <label htmlFor="email">Email</label>
-        <input id="email" {...register('email')} />
-        {errors.email && <p>{errors.email.message}</p>}
-      </div>
-      <div>
-        <label htmlFor="age">Age</label>
-        <input id="age" type="number" {...register('age', { valueAsNumber: true })} />
-        {errors.age && <p>{errors.age.message}</p>}
-      </div>
-      <button type="submit">Submit</button>
-    </form>
+    <Box component="form" onSubmit={handleSubmit(onSubmit)} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <TextField
+        label="Name"
+        {...register('name')}
+        error={!!errors.name}
+        helperText={errors.name ? errors.name.message : ''}
+      />
+      <TextField
+        label="Email"
+        {...register('email')}
+        error={!!errors.email}
+        helperText={errors.email ? errors.email.message : ''}
+      />
+      <TextField
+        label="Age"
+        type="number"
+        {...register('age', { valueAsNumber: true })}
+        error={!!errors.age}
+        helperText={errors.age ? errors.age.message : ''}
+      />
+      <Button type="submit" variant="contained">Submit</Button>
+    </Box>
   );
 };
 
